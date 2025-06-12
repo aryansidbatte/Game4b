@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="60" height="24" tilewidth="18" tileheight="18" infinite="0" nextlayerid="3" nextobjectid="12">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="60" height="24" tilewidth="18" tileheight="18" infinite="0" nextlayerid="4" nextobjectid="12">
  <editorsettings>
   <export target="HubWorld.tmj" format="json"/>
  </editorsettings>
@@ -683,4 +683,5 @@
   </object>
   <object id="11" name="spawn" gid="96" x="126" y="378" width="18" height="18"/>
  </objectgroup>
+ <objectgroup id="3" name="Objects"/>
 </map>

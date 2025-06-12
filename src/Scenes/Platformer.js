@@ -1,3 +1,11 @@
+// Global table survives scene restarts and world hops
+window.gameSave = window.gameSave ?? {
+    // structure will end up like:
+    // candy-world:    { keyCollected: true }
+    // industry-world: { keyCollected: false }
+};
+
+
 class Platformer extends Phaser.Scene {
     constructor () { super('platformerScene'); }
 
@@ -15,7 +23,9 @@ class Platformer extends Phaser.Scene {
     /* ---------------------------------- create ---------------------------------- */
     create () {
         /* 1 ─────────── build the map & collision */
-        const map = this.make.tilemap({ key: this.mapKey });
+        this.map = this.make.tilemap({ key: this.mapKey });
+        const map = this.map;   // optional shorthand
+
 
         const ts1 = map.addTilesetImage('tilemap_packed1', 'tilemap_sheet1');
         const ts2 = map.addTilesetImage('tilemap_packed2', 'tilemap_sheet2');
@@ -87,6 +97,40 @@ class Platformer extends Phaser.Scene {
         /* overlap only *marks* the door we’re touching */
         this.physics.add.overlap(my.sprite.player, doors, (_p, door) => {
             this.currentDoor = door;
+        });
+
+        /* 7 ─── single-use key ─────────────────────────────────────────────── */
+
+        // ❶ set up a tiny per-map save record
+        const save = window.gameSave[this.mapKey] ?? (window.gameSave[this.mapKey] = {});
+
+        // ❷ quit early if key already collected in this map
+        if (save.keyCollected) return;
+
+        // ❸ build sprites from Tiled objects named "key"
+        //     layer name = "Objects"
+        const keys = this.map.createFromObjects('Objects', {
+            name : 'key',                // Tiled: Name field must be exactly "key"
+            key  : 'tilemap_sheet1',     // texture key you loaded in Load.js
+            frame: 27                    // frame index / frame name that looks like a key
+        });
+
+        if (keys.length === 0) {
+            console.warn(`${this.mapKey}: no object named 'key' found on layer "Objects"`);
+            return;
+        }
+
+        // ❹ give them static physics bodies so Arcade overlap works
+        this.physics.world.enable(keys, Phaser.Physics.Arcade.STATIC_BODY);
+
+        // ❺ put them in a normal display group (optional but tidy)
+        const keyGroup = this.add.group(keys);
+
+        // ❻ overlap → collect once
+        this.physics.add.overlap(my.sprite.player, keyGroup, (_player, keySprite) => {
+            save.keyCollected = true;    // permanent for this session
+            keySprite.destroy();         // remove from the scene
+            console.log(`${this.mapKey}: key collected ✔`);
         });
 
 
