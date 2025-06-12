@@ -1,15 +1,4 @@
-// Jim Whitehead
-// Created: 4/14/2024
-// Phaser: 3.70.0
-//
-// Cubey
-//
-// An example of putting sprites on the screen using Phaser
-// 
-// Art assets from Kenny Assets "Shape Characters" set:
-// https://kenney.nl/assets/shape-characters
-
-// debug with extreme prejudice
+// main.js
 "use strict"
 
 // game config
@@ -22,7 +11,7 @@ let config = {
     physics: {
         default: 'arcade',
         arcade: {
-            debug: true,
+            debug: false,
             gravity: {
                 x: 0,
                 y: 0
@@ -31,7 +20,7 @@ let config = {
     },
     width: 1440,
     height: 864,
-    scene: [Load, Platformer]
+    scene: [Load, TitleScene, CreditsScene, Platformer,]
 }
 
 var cursors;

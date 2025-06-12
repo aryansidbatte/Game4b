@@ -1,3 +1,5 @@
+//Platformer.js
+
 // Global table survives scene restarts and world hops
 window.gameSave = window.gameSave ?? {
     // structure will end up like:
@@ -7,7 +9,6 @@ window.gameSave = window.gameSave ?? {
 
 window.gameSave.keysHeld = window.gameSave.keysHeld ?? 0;   // total keys in inventory
 
-
 class Platformer extends Phaser.Scene {
     constructor () { super('platformerScene'); }
 
@@ -16,18 +17,25 @@ class Platformer extends Phaser.Scene {
         this.mapKey   = data.map   ?? 'hub-world';  // default on first load
         this.spawnTag = data.spawn ?? null;         // undefined → use map's "spawn"
         this.ACCELERATION = 400;
-        this.DRAG         = 500;
+        this.DRAG         = 1000;
         this.physics.world.gravity.y = 1500;
-        this.JUMP_VELOCITY = -600;
+        this.JUMP_VELOCITY = -400;
         this.SCALE = 2;
+        this.walkCounter = 0; // used to play random footstep sounds
+
+        this.maxVelocity = 200; // max velocity for player sprite
+
+        this.WALL_SLIDE_SPEED   = 80;   // max fall speed while hugging wall
+        this.WALL_JUMP_VEL_X    = 50;   // kick-off force
+        this.WALL_JUMP_VEL_Y    = -350; // vertical boost
+        this.wallJumpLockMs     = 200;  // short lock-out so you can’t spam-jump
+        this._nextWallJumpTime  = 0;    // timestamp helper
     }
 
-    /* ---------------------------------- create ---------------------------------- */
     create () {
-        /* 1 ─────────── build the map & collision */
+        // map configuration
         this.map = this.make.tilemap({ key: this.mapKey });
         const map = this.map;   // optional shorthand
-
 
         const ts1 = map.addTilesetImage('tilemap_packed1', 'tilemap_sheet1');
         const ts2 = map.addTilesetImage('tilemap_packed2', 'tilemap_sheet2');
@@ -35,6 +43,12 @@ class Platformer extends Phaser.Scene {
 
         const ground = map.createLayer('Ground-n-Platforms', [ts1, ts2, ts3]);
         ground.setCollisionByProperty({ collides: true });
+
+        this.physics.world.setBounds(
+                0, 0,
+                this.map.widthInPixels,      // full pixel width of the map
+                this.map.heightInPixels      // full pixel height of the map
+            );
 
         /* 2 ─────────── choose the correct spawn point */
         const spawnLayer  = map.getObjectLayer('Spawns')       // try a layer literally called "Spawns"
@@ -49,14 +63,30 @@ class Platformer extends Phaser.Scene {
         const spawnX = chosenSpawn?.x ?? 32;
         const spawnY = chosenSpawn?.y ?? 32;
 
-        /* 3 ─────────── player */
+        // player
         my.sprite.player = this.physics.add
             .sprite(spawnX, spawnY, 'platformer_characters', 'tile_0000.png')
             .setCollideWorldBounds(true);
 
         this.physics.add.collider(my.sprite.player, ground);
 
-        /* 4 ─────────── invisible door triggers */
+        this.physics.world.setBoundsCollision(true, true, true, false);
+
+        // player sounds
+        this.jumpSfx = this.sound.add("jump_sfx", {
+            volume: 0.4,   // tweak to taste
+        });
+
+        this.steps = [
+            this.sound.add("step1"),
+            this.sound.add("step2"),
+            this.sound.add("step3"),
+            this.sound.add("step4"),
+            this.sound.add("step5")
+        ];
+
+
+        // Door triggers
         const doorObjs = map.getObjectLayer('Doors')?.objects ?? [];
         const doors    = this.physics.add.staticGroup();
 
@@ -108,19 +138,17 @@ class Platformer extends Phaser.Scene {
             this.background = this.add.tileSprite(0, 200, 1440, 396, "level_background").setScale(4).setScrollFactor(0.2).setDepth(-1);
         }
 
-        /* ── ONE-USE LOCKS (SnowWorld) ───────────────────────────── */
+        // One time use locks
         if (this.mapKey === 'snow-world') {
 
-            console.warn('SnowWorld: locks and credits are experimental!');
-
-            /* ---------- persistent per-map save --------- */
+            // per map save
             const snowSave = window.gameSave['snow-world'] ?? (window.gameSave['snow-world'] = {
                 locksUnlockedCount: 0          // how many locks have been opened so far
             });
 
-            /* ---------- build every lock sprite that is still locked ---------- */
+            // create lock sprite that are still locked
             const liveLocks = this.map.createFromObjects('Objects', {
-                name : 'lock',                 // <-- both of your objects are named “lock”
+                name : 'lock',
                 key  : 'tilemap_sheet1',
                 frame: 28
             }).filter(() => snowSave.locksUnlockedCount < 2);   // skip if both gone
@@ -135,7 +163,7 @@ class Platformer extends Phaser.Scene {
                 });
             }
 
-            /* ---------- build the credits object (hidden until all locks gone) ---------- */
+            // credits door 
             const creditsArr = this.map.createFromObjects('Objects', {
                 name : 'credits',
                 key  : 'tilemap_sheet1',
@@ -152,20 +180,19 @@ class Platformer extends Phaser.Scene {
             }
         }
 
-        /* 7 ─── single-use key ─────────────────────────────────────────────── */
+        // single use key
 
-        // ❶ set up a tiny per-map save record
+        // per map save
         const save = window.gameSave[this.mapKey] ?? (window.gameSave[this.mapKey] = {});
 
-        // ❷ quit early if key already collected in this map
         if (save.keyCollected) return;
 
-        // ❸ build sprites from Tiled objects named "key"
+        // build keys
         //     layer name = "Objects"
         const keys = this.map.createFromObjects('Objects', {
-            name : 'key',                // Tiled: Name field must be exactly "key"
-            key  : 'tilemap_sheet1',     // texture key you loaded in Load.js
-            frame: 27                    // frame index / frame name that looks like a key
+            name : 'key',                
+            key  : 'tilemap_sheet1',
+            frame: 27
         });
 
         if (keys.length === 0) {
@@ -173,13 +200,10 @@ class Platformer extends Phaser.Scene {
             return; // Make sure nothing is after this in create()
         }
 
-        // ❹ give them static physics bodies so Arcade overlap works
         this.physics.world.enable(keys, Phaser.Physics.Arcade.STATIC_BODY);
 
-        // ❺ put them in a normal display group (optional but tidy)
         const keyGroup = this.add.group(keys);
 
-        // ❻ overlap → collect once
         this.physics.add.overlap(my.sprite.player, keyGroup, (_p, keySprite) => {
             save.keyCollected = true;       // per-map flag
             window.gameSave.keysHeld += 1;  // add to player’s inventory
@@ -188,8 +212,14 @@ class Platformer extends Phaser.Scene {
         });
     }
 
-    /* ---------------------------------- update ---------------------------------- */
     update () {
+        
+        // wall slide and wall jump logic
+        const onGround    = my.sprite.player.body.blocked.down;
+        const onLeftWall  = my.sprite.player.body.blocked.left;
+        const onRightWall = my.sprite.player.body.blocked.right;
+        const onAnyWall   = (onLeftWall || onRightWall) && !onGround;
+
         if (this.currentDoor &&
             Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
 
@@ -199,7 +229,7 @@ class Platformer extends Phaser.Scene {
             });
         }
 
-        /* 2. clear the reference as soon as we’re no longer overlapping         */
+        // clear door if we’re not touching it anymore
         if (this.currentDoor &&
             !this.physics.world.overlap(my.sprite.player, this.currentDoor)) {
 
@@ -207,43 +237,102 @@ class Platformer extends Phaser.Scene {
         }
         
         
-        /* ----- your existing left / right / jump logic ----- */
-        if (cursors.left.isDown) {
+        // left right movement
+        const randomStep = () => Phaser.Math.RND.pick(this.steps);
+
+        const randomDetune = () => Phaser.Math.Between(-1000, -500);
+
+        if(cursors.left.isDown) {
             my.sprite.player.setAccelerationX(-this.ACCELERATION);
             my.sprite.player.resetFlip();
             my.sprite.player.anims.play('walk', true);
-            // smoke etc.
-        } else if (cursors.right.isDown) {
+            
+            if(my.sprite.player.body.blocked.down && this.walkCounter-- % 6 == 0){
+                if(this.walkCounter < 0){
+                    this.walkCounter = 20;
+                    randomStep().play({
+                        volume: 0.1,
+                        detune: randomDetune() 
+                    });
+                }
+            }
+
+            if (my.sprite.player.body.velocity.x < -this.maxVelocity) {
+                my.sprite.player.body.setVelocityX(-this.maxVelocity);
+            }
+        } else if(cursors.right.isDown) {
             my.sprite.player.setAccelerationX(this.ACCELERATION);
             my.sprite.player.setFlip(true, false);
             my.sprite.player.anims.play('walk', true);
+
+            if(my.sprite.player.body.blocked.down && this.walkCounter-- % 6 == 0){
+                if(this.walkCounter < 0){
+                    this.walkCounter = 20;
+                    randomStep().play({
+                        volume: 0.1,
+                        detune: randomDetune()
+                    });
+                }
+            }
+
+            if (my.sprite.player.body.velocity.x > this.maxVelocity) {
+                my.sprite.player.body.setVelocityX(this.maxVelocity);
+            }
         } else {
             my.sprite.player.setAccelerationX(0);
             my.sprite.player.setDragX(this.DRAG);
             my.sprite.player.anims.play('idle');
         }
-
-        if (!my.sprite.player.body.blocked.down) {
-            my.sprite.player.anims.play('jump');
-        }
-        if (my.sprite.player.body.blocked.down && Phaser.Input.Keyboard.JustDown(cursors.up)) {
-            my.sprite.player.setVelocityY(this.JUMP_VELOCITY);
-            this.JUMP_VELOCITY = -600;
+        // Wall Slide
+        if (onAnyWall && my.sprite.player.body.velocity.y > this.WALL_SLIDE_SPEED) {
+            my.sprite.player.body.setVelocityY(this.WALL_SLIDE_SPEED);
         }
 
-        /* ── unlock a lock with SPACE ─────────────────────────── */
+        // Jump
+        if (Phaser.Input.Keyboard.JustDown(cursors.up)) {
+            const now = this.time.now;
+
+            // ground jump
+            if (onGround) {
+                my.sprite.player.setVelocityY(this.JUMP_VELOCITY);
+                this.jumpSfx.play();
+            }
+            // wall jump
+            else if (onAnyWall && now >= this._nextWallJumpTime) {
+                my.sprite.player.setVelocityY(this.WALL_JUMP_VEL_Y);
+                if (onLeftWall)  my.sprite.player.setVelocityX(this.WALL_JUMP_VEL_X);
+                if (onRightWall) my.sprite.player.setVelocityX(-this.WALL_JUMP_VEL_X);
+                this._nextWallJumpTime = now + this.wallJumpLockMs;
+                this.jumpSfx.play();
+            }
+        }
+
+        // anim in air
+        if (!onGround) my.sprite.player.anims.play('jump');
+
+        // vertical wrap-around
+        const worldTop    = this.physics.world.bounds.top;
+        const worldBottom = this.physics.world.bounds.bottom;
+        const buffer      = 4;
+
+        if (my.sprite.player.body.y > worldBottom) {
+            my.sprite.player.body.reset(my.sprite.player.x, worldTop + buffer);
+            my.sprite.player.body.setVelocityY(0);
+        }
+
+        // unlock a lock w/ space key
         if (this.currentLock && Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
 
             if (window.gameSave.keysHeld > 0) {
-                window.gameSave.keysHeld -= 1;                 // consume one key
-                this.currentLock.destroy();                    // remove lock sprite
+                window.gameSave.keysHeld -= 1; // use 1 key
+                this.currentLock.destroy();    // destory spite
                 this.currentLock = null;
 
                 const snowSave = window.gameSave['snow-world'];
-                snowSave.locksUnlockedCount += 1;              // remember permanently
+                snowSave.locksUnlockedCount += 1; // save data
                 console.log(`Unlocked a lock! (${snowSave.locksUnlockedCount}/2)  keysHeld=${window.gameSave.keysHeld}`);
 
-                /* reveal credits when both locks gone */
+                // Credits if both locks are cleared
                 if (snowSave.locksUnlockedCount === 2 && this.creditsGroup) {
                     this.creditsGroup.setVisible(true);
                     console.log('All locks cleared → credits enabled.');
@@ -255,7 +344,7 @@ class Platformer extends Phaser.Scene {
 
         /* ── press SPACE on credits to roll credits ───────────── */
         if (this.currentCredit && Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-            this.scene.start('CreditsScene');   // change the scene key if needed
+            this.scene.start('creditsScene');   // change the scene key if needed
         }
 
         /* quick restart */

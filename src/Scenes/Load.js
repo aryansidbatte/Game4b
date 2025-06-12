@@ -36,6 +36,13 @@ class Load extends Phaser.Scene {
             frameHeight: 18
         });
 
+        this.load.audio("jump_sfx", "jump.wav");
+        this.load.audio("step1", "step1.ogg");
+        this.load.audio("step2", "step2.ogg");
+        this.load.audio("step3", "step3.ogg");
+        this.load.audio("step4", "step4.ogg");
+        this.load.audio("step5", "step5.ogg");
+
         // Oooh, fancy. A multi atlas is a texture atlas which has the textures spread
         // across multiple png files, so as to keep their size small for use with
         // lower resource devices (like mobile phones).
@@ -77,7 +84,9 @@ class Load extends Phaser.Scene {
         });
 
          // ...and pass to the next Scene
-        this.scene.start('platformerScene', { map: 'hub-world', spawn: 'hubSpawn' });
+
+        this.scene.start('TitleScene');
+        //this.scene.start('platformerScene', { map: 'hub-world', spawn: 'hubSpawn' });
     }
 
     // Never get here since a new scene is started in create()
