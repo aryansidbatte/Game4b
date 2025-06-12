@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="4" height="6" tilewidth="24" tileheight="24" infinite="0" nextlayerid="2" nextobjectid="1">
+ <tileset firstgid="1" name="tilemap-backgrounds_packed" tilewidth="24" tileheight="24" tilecount="24" columns="8">
+  <image source="tilemap-backgrounds_packed.png" width="192" height="72"/>
+ </tileset>
+ <layer id="1" name="Tile Layer 1" width="4" height="6">
+  <data encoding="csv">
+5,5,5,5,
+5,5,5,5,
+5,5,5,5,
+13,14,13,14,
+21,21,21,21,
+21,21,21,21
+</data>
+ </layer>
+</map>

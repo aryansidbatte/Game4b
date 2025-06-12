@@ -13,6 +13,10 @@ class Load extends Phaser.Scene {
         this.load.image("tilemap_packed1", "tilemap_packed1.png");            // Packed tilemap
         this.load.image("tilemap_packed2", "tilemap_packed2.png");            // Packed tilemap
         this.load.image("tilemap_packed3", "tilemap_packed3.png");            // Packed tilemap
+
+        this.load.image("level_background", "LevelBackground.png");
+        this.load.image("industry_level_background", "IndustryWorldBackground.png");
+
         this.load.tilemapTiledJSON("hub-world", "HubWorld.tmj");             // Tilemap in JSON
         this.load.tilemapTiledJSON("candy-world", "CandyWorld.tmj");         // Tilemap in JSON
         this.load.tilemapTiledJSON("industry-world", "IndustryWorld.tmj");   // Tilemap in JSON
