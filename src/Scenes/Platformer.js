@@ -1,189 +1,144 @@
 class Platformer extends Phaser.Scene {
-    constructor() {
-        super("platformerScene");
-    }
+    constructor () { super('platformerScene'); }
 
-    init() {
-        // variables and settings
+    /* ---------------------------------- bootstrap ---------------------------------- */
+    init (data) {
+        this.mapKey   = data.map   ?? 'hub-world';  // default on first load
+        this.spawnTag = data.spawn ?? null;         // undefined → use map's "spawn"
         this.ACCELERATION = 400;
-        this.DRAG = 500;    // DRAG < ACCELERATION = icy slide
+        this.DRAG         = 500;
         this.physics.world.gravity.y = 1500;
         this.JUMP_VELOCITY = -600;
-        this.PARTICLE_VELOCITY = 50;
-        this.SCALE = 2.0;
+        this.SCALE = 2;
     }
 
-    create() {
-        // Create a new tilemap game object which uses 18x18 pixel tiles, and is
-        // 45 tiles wide and 25 tiles tall.
-        this.map = this.add.tilemap("platformer-level-1", 18, 18, 45, 25);
+    /* ---------------------------------- create ---------------------------------- */
+    create () {
+        /* 1 ─────────── build the map & collision */
+        const map = this.make.tilemap({ key: this.mapKey });
 
-        // Add a tileset to the map
-        // First parameter: name we gave the tileset in Tiled
-        // Second parameter: key for the tilesheet (from this.load.image in Load.js)
-        this.tileset = this.map.addTilesetImage("kenny_tilemap_packed", "tilemap_tiles");
+        const ts1 = map.addTilesetImage('tilemap_packed1', 'tilemap_sheet1');
+        const ts2 = map.addTilesetImage('tilemap_packed2', 'tilemap_sheet2');
+        const ts3 = map.addTilesetImage('tilemap_packed3', 'tilemap_sheet3');
 
-        // Create a layer
-        this.groundLayer = this.map.createLayer("Ground-n-Platforms", this.tileset, 0, 0);
+        const ground = map.createLayer('Ground-n-Platforms', [ts1, ts2, ts3]);
+        ground.setCollisionByProperty({ collides: true });
 
-        // Make it collidable
-        this.groundLayer.setCollisionByProperty({
-            collides: true
+        /* 2 ─────────── choose the correct spawn point */
+        const spawnLayer  = map.getObjectLayer('Spawns')       // try a layer literally called "Spawns"
+                         ?? map.getObjectLayer('Objects')      // or "Objects"
+                         ?? { objects: [] };
+
+        const defaultSpawn = spawnLayer.objects.find(o => o.name === 'spawn');
+        const chosenSpawn  = this.spawnTag
+                           ? spawnLayer.objects.find(o => o.name === this.spawnTag) || defaultSpawn
+                           : defaultSpawn;
+
+        const spawnX = chosenSpawn?.x ?? 32;
+        const spawnY = chosenSpawn?.y ?? 32;
+
+        /* 3 ─────────── player */
+        my.sprite.player = this.physics.add
+            .sprite(spawnX, spawnY, 'platformer_characters', 'tile_0000.png')
+            .setCollideWorldBounds(true);
+
+        this.physics.add.collider(my.sprite.player, ground);
+
+        /* 4 ─────────── invisible door triggers */
+        const doorObjs = map.getObjectLayer('Doors')?.objects ?? [];
+        const doors    = this.physics.add.staticGroup();
+
+        doorObjs.forEach(o => {
+            const targetProp = o.properties?.find(p => p.name === 'target')?.value;
+            if (!targetProp) {
+                console.warn(`Door at (${o.x},${o.y}) is missing 'target' property`);
+                return;                                         // skip mis-configured door
+            }
+
+            const spawnProp  = o.properties?.find(p => p.name === 'spawn')?.value; // may be undefined
+
+            doors.create(o.x + o.width/2, o.y - o.height/2)
+                 .setSize(o.width, o.height)
+                 .setVisible(false)
+                 .setData('target', targetProp)
+                 .setData('spawn',  spawnProp);                 // may be undefined
         });
 
-        // Find coins in the "Objects" layer in Phaser
-        // Look for them by finding objects with the name "coin"
-        // Assign the coin texture from the tilemap_sheet sprite sheet
-        // Phaser docs:
-        // https://newdocs.phaser.io/docs/3.80.0/focus/Phaser.Tilemaps.Tilemap-createFromObjects
+        if (this.mapKey !== 'hub-world' && defaultSpawn) {
+            doors.create(defaultSpawn.x, defaultSpawn.y)       // centre on the spawn point
+                .setSize(32, 32)                              // 32×32 invisible hit-box
+                .setVisible(false)
+                .setData('target', 'hub-world')               // always go back to the hub
+                .setData('spawn',  null);                     // hub’s normal 'spawn'
+        }
 
-        this.coins = this.map.createFromObjects("Objects", {
-            name: "coin",
-            key: "tilemap_sheet",
-            frame: 151
-        });
+        /* 5 ─────────── camera */
+        this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels)
+                         .startFollow(my.sprite.player)
+                         .setZoom(this.SCALE);
 
-        this.powerups = this.map.createFromObjects("Objects", {
-            name: "powerup",
-            key: "tilemap_sheet",
-            frame: 67
-        });
-
-        const spawnPoint = this.map.findObject(
-            "Objects",
-            obj => obj.name === "spawn"
-        );
-
-        // Since createFromObjects returns an array of regular Sprites, we need to convert 
-        // them into Arcade Physics sprites (STATIC_BODY, so they don't move) 
-        this.physics.world.enable(this.coins, Phaser.Physics.Arcade.STATIC_BODY);
-        this.physics.world.enable(this.powerups, Phaser.Physics.Arcade.STATIC_BODY);
-
-        // Create a Phaser group out of the array this.coins
-        // This will be used for collision detection below.
-        this.coinGroup = this.add.group(this.coins);
-        this.powerupGroup = this.add.group(this.powerups);
-        
-
-        // set up player avatar at spawn point
-        //my.sprite.player = this.physics.add.sprite(30, 345, "platformer_characters", "tile_0000.png");// Create the player at the spawn coordinates
-        my.sprite.player = this.physics.add.sprite(
-            spawnPoint.x +9,
-            spawnPoint.y,
-            "platformer_characters",
-            "tile_0000.png"
-        );
-        my.sprite.player.setCollideWorldBounds(true);
-
-        // Enable collision handling
-        this.physics.add.collider(my.sprite.player, this.groundLayer);
-
-        // Handle collision detection with coins
-        this.physics.add.overlap(my.sprite.player, this.coinGroup, (obj1, obj2) => {
-            obj2.destroy(); // remove coin on overlap
-        });
-
-        this.physics.add.overlap(my.sprite.player, this.powerupGroup, (obj1, obj2) => {
-            obj2.destroy(); // remove power on overlap
-            this.JUMP_VELOCITY = -800; // increase jump height
-        });
-        
-
-        // set up Phaser-provided cursor key input
+        /* 6 ─────────── input */
         cursors = this.input.keyboard.createCursorKeys();
-
         this.rKey = this.input.keyboard.addKey('R');
 
-        // debug key listener (assigned to D key)
-        this.input.keyboard.on('keydown-D', () => {
-            this.physics.world.drawDebug = this.physics.world.drawDebug ? false : true
-            this.physics.world.debugGraphic.clear()
-        }, this);
+        this.spaceKey   = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        this.currentDoor = null;
 
-        // movement vfx
-
-        my.vfx.walking = this.add.particles(0, 0, "kenny-particles", {
-            frame: ['smoke_03.png', 'smoke_09.png'],
-            // TODO: Try: add random: true
-            scale: {start: 0.03, end: 0.1},
-            // TODO: Try: maxAliveParticles: 8,
-            lifespan: 350,
-            // TODO: Try: gravityY: -400,
-            alpha: {start: 1, end: 0.1}, 
+        /* overlap only *marks* the door we’re touching */
+        this.physics.add.overlap(my.sprite.player, doors, (_p, door) => {
+            this.currentDoor = door;
         });
 
-        my.vfx.walking.stop();
 
-        
-
-        // camera setup
-        this.cameras.main.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
-        this.cameras.main.startFollow(my.sprite.player, true, 0.25, 0.25); // (target, [,roundPixels][,lerpX][,lerpY])
-        this.cameras.main.setDeadzone(50, 50);
-        this.cameras.main.setZoom(this.SCALE);
-        
 
     }
 
-    update() {
-        if(cursors.left.isDown) {
+    /* ---------------------------------- update ---------------------------------- */
+    update () {
+        if (this.currentDoor &&
+            Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+
+            this.scene.start('platformerScene', {
+                map:   this.currentDoor.getData('target'),
+                spawn: this.currentDoor.getData('spawn')   // may be undefined
+            });
+        }
+
+        /* 2. clear the reference as soon as we’re no longer overlapping         */
+        if (this.currentDoor &&
+            !this.physics.world.overlap(my.sprite.player, this.currentDoor)) {
+
+            this.currentDoor = null;
+        }
+        
+        
+        /* ----- your existing left / right / jump logic ----- */
+        if (cursors.left.isDown) {
             my.sprite.player.setAccelerationX(-this.ACCELERATION);
             my.sprite.player.resetFlip();
             my.sprite.player.anims.play('walk', true);
-
-            // particle following
-            my.vfx.walking.startFollow(my.sprite.player, my.sprite.player.displayWidth/2-10, my.sprite.player.displayHeight/2-5, false);
-
-            my.vfx.walking.setParticleSpeed(this.PARTICLE_VELOCITY, 0);
-
-            // Only play smoke effect if touching the ground
-
-            if (my.sprite.player.body.blocked.down) {
-
-                my.vfx.walking.start();
-
-            }
-
-        } else if(cursors.right.isDown) {
+            // smoke etc.
+        } else if (cursors.right.isDown) {
             my.sprite.player.setAccelerationX(this.ACCELERATION);
             my.sprite.player.setFlip(true, false);
             my.sprite.player.anims.play('walk', true);
-            
-            // particle following
-            my.vfx.walking.startFollow(my.sprite.player, my.sprite.player.displayWidth/2-10, my.sprite.player.displayHeight/2-5, false);
-
-            my.vfx.walking.setParticleSpeed(this.PARTICLE_VELOCITY, 0);
-
-            // Only play smoke effect if touching the ground
-
-            if (my.sprite.player.body.blocked.down) {
-
-                my.vfx.walking.start();
-
-            }
-
         } else {
-            // Set acceleration to 0 and have DRAG take over
             my.sprite.player.setAccelerationX(0);
             my.sprite.player.setDragX(this.DRAG);
             my.sprite.player.anims.play('idle');
-            
-            // vfx stop
-            my.vfx.walking.stop();
         }
 
-        // player jump
-        // note that we need body.blocked rather than body.touching b/c the former applies to tilemap tiles and the latter to the "ground"
-        if(!my.sprite.player.body.blocked.down) {
+        if (!my.sprite.player.body.blocked.down) {
             my.sprite.player.anims.play('jump');
         }
-        if(my.sprite.player.body.blocked.down && Phaser.Input.Keyboard.JustDown(cursors.up)) {
-            my.sprite.player.body.setVelocityY(this.JUMP_VELOCITY);
-            this.JUMP_VELOCITY = -600; // reset jump velocity
+        if (my.sprite.player.body.blocked.down && Phaser.Input.Keyboard.JustDown(cursors.up)) {
+            my.sprite.player.setVelocityY(this.JUMP_VELOCITY);
+            this.JUMP_VELOCITY = -600;
         }
 
-        if(Phaser.Input.Keyboard.JustDown(this.rKey)) {
-            this.scene.restart();
+        /* quick restart */
+        if (Phaser.Input.Keyboard.JustDown(this.rKey)) {
+            this.scene.restart({ map: this.mapKey, spawn: this.spawnTag });
         }
     }
 }

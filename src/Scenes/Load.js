@@ -10,11 +10,24 @@ class Load extends Phaser.Scene {
         this.load.atlas("platformer_characters", "tilemap-characters-packed.png", "tilemap-characters-packed.json");
 
         // Load tilemap information
-        this.load.image("tilemap_tiles", "tilemap_packed.png");                         // Packed tilemap
-        this.load.tilemapTiledJSON("platformer-level-1", "platformer-level-1.tmj");   // Tilemap in JSON
+        this.load.image("tilemap_packed1", "tilemap_packed1.png");            // Packed tilemap
+        this.load.image("tilemap_packed2", "tilemap_packed2.png");            // Packed tilemap
+        this.load.image("tilemap_packed3", "tilemap_packed3.png");            // Packed tilemap
+        this.load.tilemapTiledJSON("hub-world", "HubWorld.tmj");             // Tilemap in JSON
+        this.load.tilemapTiledJSON("candy-world", "CandyWorld.tmj");         // Tilemap in JSON
+        this.load.tilemapTiledJSON("industry-world", "IndustryWorld.tmj");   // Tilemap in JSON
+        this.load.tilemapTiledJSON("snow-world", "SnowWorld.tmj");           // Tilemap in JSON
 
         // Load the tilemap as a spritesheet
-        this.load.spritesheet("tilemap_sheet", "tilemap_packed.png", {
+        this.load.spritesheet("tilemap_sheet1", "tilemap_packed1.png", {
+            frameWidth: 18,
+            frameHeight: 18
+        });
+        this.load.spritesheet("tilemap_sheet2", "tilemap_packed2.png", {
+            frameWidth: 18,
+            frameHeight: 18
+        });
+        this.load.spritesheet("tilemap_sheet3", "tilemap_packed3.png", {
             frameWidth: 18,
             frameHeight: 18
         });
@@ -60,7 +73,7 @@ class Load extends Phaser.Scene {
         });
 
          // ...and pass to the next Scene
-         this.scene.start("platformerScene");
+        this.scene.start('platformerScene', { map: 'hub-world', spawn: 'hubSpawn' });
     }
 
     // Never get here since a new scene is started in create()
