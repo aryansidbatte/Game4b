@@ -1,14 +1,14 @@
-# Greenie's Jumping Adventure 🎮
+# Greenie's Jumping Adventure
 
-**[🎮 Play Live Demo](https://aryansidbatte.github.io/Game4b/)**
+**[Play Live Demo](https://aryansidbatte.github.io/Game4b/)**
 
 A 2D platformer game built with Phaser.js featuring physics-based gameplay, multiple worlds, and key-collection mechanics.
 
-## 🎯 Overview
+## Overview
 
 Greenie's Jumping Adventure is a browser-based platformer where players navigate through three interconnected worlds to collect keys and unlock the final door. The game demonstrates object-oriented JavaScript programming, game physics implementation, and scene management.
 
-## ✨ Features
+## Features
 
 - **Physics-Based Platforming**: Smooth character movement with arcade physics and gravity
 - **Multi-World System**: Three unique levels with progressive difficulty
@@ -16,7 +16,7 @@ Greenie's Jumping Adventure is a browser-based platformer where players navigate
 - **Interactive Objects**: Doors, keys, and environmental triggers
 - **Scene Management**: Efficient loading between different game scenes
 
-## 🎮 Controls
+## Controls
 
 | Key | Action |
 |-----|--------|
@@ -24,11 +24,11 @@ Greenie's Jumping Adventure is a browser-based platformer where players navigate
 | Space | Interact with objects |
 | R | Restart level at spawn |
 
-## 🎯 Gameplay
+## Gameplay
 
 Your mission: Find the two keys hidden in the first two worlds to open the last door in the third world.
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Game Engine**: Phaser 3 (HTML5 game framework)
 - **Language**: JavaScript (ES6+)
@@ -36,7 +36,7 @@ Your mission: Find the two keys hidden in the first two worlds to open the last 
 - **Rendering**: Canvas/WebGL
 - **Deployment**: GitHub Pages
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 Game4b/
@@ -48,7 +48,7 @@ Game4b/
 └── index.html           # Entry point
 ```
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Play Online
 Visit [https://aryansidbatte.github.io/Game4b/](https://aryansidbatte.github.io/Game4b/)
@@ -72,7 +72,7 @@ npx http-server
 
 3. Open `http://localhost:8000` in your browser
 
-## 🎓 Learning Outcomes
+## Learning Outcomes
 
 This project demonstrates:
 - Game loop and scene management
@@ -81,7 +81,7 @@ This project demonstrates:
 - Asset loading and sprite rendering
 - Input handling and player controls
 
-## 📝 License
+## License
 
 This project was created as part of UCSC coursework.
 
